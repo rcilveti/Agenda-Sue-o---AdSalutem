@@ -11,8 +11,8 @@
   "lang": "es",
   "icons": [
     {
-      "src": "icon-192.png",
-      "sizes": "192x192",
+      "src": "icon-32.png",
+      "sizes": "32x32",
       "type": "image/png",
       "purpose": "any maskable"
     },
