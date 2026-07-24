@@ -3,7 +3,7 @@
 Diario de sueño de tres semanas en formato digital. Aplicación de un solo archivo,
 sin servidor ni base de datos.
 
-**Versión actual:** v4.2.8 — MODO PILOTO (datos ficticios, sin cifrado)
+**Versión actual:** v4.3.3 — MODO PILOTO (datos ficticios, sin cifrado)
 
 ---
 
