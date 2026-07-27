@@ -512,7 +512,7 @@
     <span class="brandlogo" id="brandHeader"></span>
     <div>
       <h1>Agenda de Sueño</h1>
-      <p id="appHeaderSub">Unidad de Trastornos del Sueño · seguimiento de 3 semanas · v4.5.4 (julio 2026)</p>
+      <p id="appHeaderSub">Unidad de Trastornos del Sueño · seguimiento de 3 semanas · v4.5.5 (julio 2026)</p>
       <div id="pilotBanner" style="display:none;margin:6px 0 0;padding:6px 12px;background:#fff4e0;border:1px solid #e0b070;border-left:4px solid #b26a00;font-size:.76rem;color:#8a5200;line-height:1.4">
         <strong>MODO PILOTO — solo datos ficticios.</strong> Los archivos se exportan sin cifrar. No usar con pacientes reales.
       </div>
@@ -805,7 +805,7 @@ var QRCode;!function(){function a(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this
 </script>
 <script>
 const $=id=>document.getElementById(id);
-const APP_VERSION="4.5.4";  // ← número de versión centralizado; cambiar solo aquí en futuras actualizaciones
+const APP_VERSION="4.5.5";  // ← número de versión centralizado; cambiar solo aquí en futuras actualizaciones
 const APP_VER_FILE=APP_VERSION.replace(/\./g,'_');  // forma para nombres de archivo (p. ej. "3_0")
 const APP_COPYRIGHT="© 2026 AdSalutem - Robert Cilveti Portillo. Uso bajo licencia. Todos los derechos reservados.";  // aviso de copyright centralizado
 // Mostrar el número de versión en los textos visibles de la interfaz
@@ -887,14 +887,20 @@ function _credencialDePaciente(id){
   return null;
 }
 $("loginBtn").onclick=async()=>{
-  const u=$("luser").value.trim().toLowerCase(),p=$("lpass").value;
-  const acc=await ensureAccounts();$("loginErr").textContent="";
+  const u=$("luser").value.trim().toLowerCase(),p=$("lpass").value.trim();
+  const acc=await ensureAccounts();$("loginErr").textContent="";$("loginErr").style.color='';
   // v4.3.7: una sola pantalla. El rol se decide por las credenciales:
   // 1º se comprueba si es una cuenta de profesional; si no, si es un PIN de paciente vigente.
   const d=acc.doctors[u];
   if(d&&d.pass===p){session={role:'doctor',name:d.name};enterApp();return;}
-  const pa=acc.patients[u];
-  if(pa&&pa.pass===p){
+  // v4.5.5: el PIN se compara como texto y también contra el propio identificador de usuario,
+  // por si el navegador móvil añadió algún espacio o mayúscula. La comparación es tolerante.
+  let pa=acc.patients[u];
+  if(!pa){
+    // buscar de forma tolerante: alguna cuenta cuyo PIN coincida ignorando espacios
+    for(const k in (acc.patients||{})){ if(String(k).trim()===u){pa=acc.patients[k];break;} }
+  }
+  if(pa && String(pa.pass).trim()===p){
     // Validez del PIN del paciente (2 meses). Caducado -> no entra.
     if(pa.expires && Date.now()>new Date(pa.expires).getTime()){
       $("loginErr").textContent="Este acceso ha caducado. Pide uno nuevo a tu profesional.";
@@ -902,7 +908,17 @@ $("loginBtn").onclick=async()=>{
     }
     session={role:'patient',name:pa.name,patientId:pa.id};enterApp();return;
   }
-  $("loginErr").textContent="Usuario o contraseña incorrectos.";
+  // v4.5.5: diagnóstico. Si el login falla, se muestra información técnica para localizar
+  // la causa (modo de almacenamiento y qué PINs hay guardados en este dispositivo).
+  try{
+    const pins=Object.keys(acc.patients||{}).filter(k=>k!=='paciente');
+    const info='Usuario o contraseña incorrectos.\n[diag] modo:'+storageMode+
+      ' · PINs guardados:'+(pins.length?pins.join(','):'ninguno')+
+      ' · tecleado:"'+u+'"/"'+p+'"';
+    $("loginErr").textContent=info;
+    $("loginErr").style.whiteSpace='pre-wrap';
+    console.log('[login-diag]',{storageMode,pins,u,p,acc:acc.patients});
+  }catch(e){ $("loginErr").textContent="Usuario o contraseña incorrectos."; }
 };
 $("logoutBtn").onclick=()=>{
   // v4.2.4: al salir se borra la memoria efímera del paciente; el siguiente usuario del
