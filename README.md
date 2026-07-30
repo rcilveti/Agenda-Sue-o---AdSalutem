@@ -3,7 +3,7 @@
 Diario de sueño de tres semanas en formato digital. Aplicación de un solo archivo,
 sin servidor ni base de datos, pensada para funcionar en móvil, tableta y ordenador.
 
-**Versión actual:** v4.6.0 — MODO PILOTO (datos ficticios, sin cifrado)
+**Versión actual:** v4.8.0 — MODO PILOTO (datos ficticios, sin cifrado)
 
 ---
 
@@ -46,28 +46,35 @@ si quien entra es profesional o paciente.
 **Profesional** (usuario y contraseña). Gestiona los diarios, ve el análisis clínico
 de cada caso y las exportaciones. En la demo: `medico` / `clinica`.
 
-**Paciente** (PIN de 3 cifras en modo piloto). Rellena su diario cada día. El PIN lo
-genera el profesional al crear el diario y tiene una validez de 2 meses. En la demo
-también existe el acceso `paciente` / `demo`.
+**Paciente** (acceso por código QR; PIN de 3 cifras como alternativa). Rellena su diario
+cada día. El acceso lo genera el profesional al crear el diario y tiene una validez de
+2 meses. En la demo también existe el acceso `paciente` / `demo`.
 
 ### Circuito de uso
 
 1. El profesional crea un diario nuevo y completa los datos del paciente. Al pulsar
-   **«Guardar datos del paciente»**, la aplicación muestra las **credenciales de acceso**:
-   PIN, código QR, enlace de la aplicación y datos del paciente, con botones para
-   imprimir o enviar por WhatsApp o correo.
-2. El paciente entra con su PIN y rellena el diario cada día. En su dispositivo, el
-   diario se guarda solo y se genera una copia de seguridad automática.
-3. Al terminar, el paciente devuelve su diario como **archivo** o como **enlace**.
-4. El profesional lo recibe y lo carga en su base con un toque.
+   **«Guardar datos del paciente»**, la aplicación muestra el **código QR de acceso**
+   (con el PIN y los datos incorporados), el enlace y botones para imprimir o enviar.
+2. El paciente **escanea el QR una sola vez**: entra directo, con su ficha ya rellena y
+   el diario en blanco listo. No teclea nada. Su acceso queda guardado en el dispositivo,
+   así que después abre el icono y entra directo.
+3. El paciente rellena el diario cada día (edición día a día, con autoguardado).
+4. Al terminar, pulsa **«Enviar mi diario»** y lo devuelve por WhatsApp o correo; el
+   profesional lo carga en su base con un toque.
+
+### Rellenado y varios dispositivos
+
+En el dispositivo del paciente el diario se autoguarda tras cada cambio: nada se pierde
+entre sesiones. Lo recomendable es usar siempre el mismo dispositivo; aun así, si el
+diario se carga en un segundo dispositivo, la aplicación **fusiona** en vez de
+sobrescribir, conservando los días registrados en cualquiera de los dos.
 
 ### Formas de intercambiar los datos
 
-- **Archivo** (CSV, ~2 KB): se ve como un archivo normal, se abre en Excel y es la vía
-  recomendada para el envío diario.
-- **Enlace**: el diario viaja dentro del enlace (comprimido). Útil como copia de
-  seguridad y para recuperar el diario en otro dispositivo. Es un texto largo.
-- **Pegar contenido**: alternativa universal cuando el móvil no deja elegir el archivo.
+- **Código QR** (inicio): lleva el acceso y los datos de ficha. Un escaneo y el paciente
+  está dentro.
+- **Archivo** (CSV, ~2 KB) o **enlace** (devolución): el diario completo viaja por
+  WhatsApp o correo al terminar.
 
 ---
 

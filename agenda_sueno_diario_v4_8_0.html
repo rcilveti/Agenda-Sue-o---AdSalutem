@@ -777,7 +777,7 @@
           <button class="btn sec" id="exportJson" style="padding:6px 12px;font-size:.78rem" title="Copia completa del diario en JSON (para reimportar)">JSON</button>
           <button class="btn sec" id="printBtn" style="padding:6px 12px;font-size:.78rem" title="PDF del diario (cabecera + rejilla en una hoja)">PDF del diario</button>
           <button class="btn sec" id="printAnalysisBtn" style="padding:6px 12px;font-size:.78rem" title="PDF con TODOS los datos del análisis (métricas, comparativas, cronotipo, gráficos e informe)">PDF del análisis completo</button>
-          <button class="btn sec" id="wordAnalysisBtn" style="padding:6px 12px;font-size:.78rem" title="Word editable SOLO con el informe clínico, para revisarlo y completarlo antes de la historia clínica">Word del informe clínico</button>
+          <button class="btn sec" id="wordAnalysisBtn" style="padding:6px 12px;font-size:.78rem" title="Word editable con TODO el análisis (métricas, comparativas, cronotipo, resumen por día e informe), para revisarlo antes de la historia clínica">Word del análisis completo</button>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px" id="ioDbRow">
           <span style="font-size:.74rem;color:var(--mist);min-width:120px">Base de datos:</span>
@@ -3729,14 +3729,44 @@ async function exportAnalysisWord(){
   body+=tr(['Cronotipo (MSFsc)',esc(A.chrono),C(A.MSFsc)]);
   body+='</table>';
 
-  // resumen por semana
-  body+=H('Resumen por semana y total');
-  body+='<table style="border-collapse:collapse;width:100%;font-size:9pt">';
-  body+=tr(['Periodo','Días','TST','TIB','Efic.%','WASO','Siesta','C.sueño'],{head:true});
-  const wrow=(n,w)=>tr([n,w.n,HM(w.tst),HM(w.tib),R2(w.se),R2(w.waso),R2(w.nap),R2(w.qs)]);
-  A.weeks.forEach((w,i)=>body+=wrow('Semana '+(i+1),w));
-  body+=wrow('<b>Total 3 semanas</b>',A.total);
+  // resumen por día, semana y total (completo, como el PDF)
+  body+=H('Resumen por día, semana y total');
+  body+='<table style="border-collapse:collapse;width:100%;font-size:8pt">';
+  body+=tr(['Día','Acost.','Levant.','P.medio','Lat.','Desp.term.','TST','TIB','WASO','Nºd','Efic.','Siesta','Acont.','C.sue','C.desp','Est.día'],{head:true});
+  const QW=v=>({0:'—',1:'Mala',2:'Reg.',3:'Buena'}[v]||'—');
+  const all=A.all||[];
+  for(let wk=0;wk<3;wk++){
+    for(let k=0;k<7;k++){
+      const d=wk*7+k,m=all[d];
+      const lbl=(typeof label==='function')?label(d):{dn:'Día '+(d+1),dd:''};
+      const fest=state[d].lf==='F';
+      const atip=(typeof diaAtipico==='function')?diaAtipico(m):null;
+      const marca=atip?' ⚠':'';
+      const nombreDia=esc(lbl.dn)+(fest?' ✦':'')+marca;
+      const cells=[nombreDia,
+        m.hasData?C(m.bedDisp):'—', m.hasData?C(m.riseDisp):'—',
+        m.midSleep==null?'—':C(m.midSleep),
+        m.sol==null?'—':R2(m.sol)+'′', m.wakeLat==null?'—':R2(m.wakeLat)+'′',
+        m.hasData?HM(m.tst):'—', m.tib?HM(m.tib):'—',
+        m.hasData?R2(m.waso)+'′':'—', m.nWake==null?'—':m.nWake,
+        m.se==null?'—':R2(m.se)+'%', m.napMin?m.napMin+'′':'—',
+        m.nEvents?m.nEvents:'—', QW(state[d].qs),QW(state[d].qd),QW(state[d].qe)];
+      const bg=atip?'background:#fff6e6;':(fest?'background:#f4f0e6;':'');
+      body+='<tr>'+cells.map(c=>`<td style="border:1px solid #b9c9d6;padding:2px 4px;${bg}">${c}</td>`).join('')+'</tr>';
+    }
+    const w=A.weeks[wk];
+    body+=tr(['<b>Semana '+(wk+1)+' (media)</b>',C(w.bed),C(w.rise),C(w.mid),w.sol==null?'—':R2(w.sol)+'′',w.wakeLat==null?'—':R2(w.wakeLat)+'′',HM(w.tst),HM(w.tib),w.waso==null?'—':R2(w.waso)+'′',w.nWake==null?'—':R2(w.nWake),w.se==null?'—':R2(w.se)+'%',w.nap==null?'—':R2(w.nap)+'′',w.evSum||'—',R2(w.qs),R2(w.qd),R2(w.qe)],{lab:true});
+  }
+  body+=tr(['<b>TOTAL 3 semanas</b>',C(T.bed),C(T.rise),C(T.mid),T.sol==null?'—':R2(T.sol)+'′',T.wakeLat==null?'—':R2(T.wakeLat)+'′',HM(T.tst),HM(T.tib),R2(T.waso)+'′',T.nWake==null?'—':R2(T.nWake),R2(T.se)+'%',R2(T.nap)+'′',T.evSum||'—',R2(T.qs),R2(T.qd),R2(T.qe)],{lab:true});
   body+='</table>';
+  // aviso de días atípicos
+  const marcados=[];
+  for(let d=0;d<all.length;d++){const at=(typeof diaAtipico==='function')?diaAtipico(all[d]):null;if(at)marcados.push({dia:d+1,motivos:at.motivos});}
+  if(marcados.length){
+    body+='<p style="font-size:9pt;color:#8a5a12;background:#fff6e6;border-left:3px solid #e0a313;padding:6px 10px;margin:8px 0 0"><b>⚠ Días atípicos para revisar ('+marcados.length+'):</b> '+
+      marcados.map(x=>'Día '+x.dia+' ('+esc(x.motivos.join('; '))+')').join('; ')+
+      '. Métricas fisiológicamente extremas; no se ha modificado ningún cálculo, solo se señalan.</p>';
+  }
 
   // comparativa laborables/festivos
   body+=H('Comparativa laborables vs. festivos');
@@ -3750,6 +3780,35 @@ async function exportAnalysisWord(){
   body+=tr(['Jet-lag social (|MSF−MSW|)','',A.jetSocial==null?'—':HM(Math.abs(A.jetSocial))]);
   body+='</table>';
 
+  // indicadores de regularidad (mismos que el PDF)
+  body+=H('Indicadores de regularidad');
+  body+='<table style="border-collapse:collapse;width:100%;font-size:9.5pt">';
+  body+=tr(['Indicador','Valor','Valoración'],{head:true});
+  body+=tr(['Desviación de la duración del sueño (TST)',T.tstSd==null?'—':'±'+R2(T.tstSd)+' min',evtxt(cutVar(T.tstSd))]);
+  body+=tr(['Desviación de la hora de acostarse','±'+R2(T.bedSd||0)+' min',evtxt(cutVar(T.bedSd))]);
+  body+=tr(['Desviación de la hora de levantarse','±'+R2(T.riseSd||0)+' min',evtxt(cutVar(T.riseSd))]);
+  body+=tr(['Variabilidad horaria global (DE)','±'+R2(A.maxTimingSd)+' min',evtxt(cutVar(A.maxTimingSd))]);
+  body+=tr(['Índice de regularidad del sueño (SRI)',A.SRI==null?'—':R2(A.SRI),evtxt(cutSRI(A.SRI))]);
+  body+=tr(['Estabilidad interdiaria (IS)',A.IS==null?'—':R2(A.IS),'']);
+  body+=tr(['Jet-lag social (|MSF−MSW|)',A.jetSocial==null?'—':HM(Math.abs(A.jetSocial)),evtxt(cutSJL(A.jetSocial))]);
+  body+=tr(['Jet-lag social corregido (SJLsc)',A.jetSocialSc==null?'—':HM(Math.abs(A.jetSocialSc)),evtxt(cutSJL(A.jetSocialSc))]);
+  body+='</table>';
+
+  // calidad percibida
+  const qAvgW=key=>{const v=(A.all||[]).map((_,i)=>state[i][key]).filter(x=>x>=1);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length*100)/100:null;};
+  const qCount=(key,val)=>state.map(s=>s[key]).filter(v=>v===val).length;
+  const qTot=key=>state.map(s=>s[key]).filter(v=>v>=1).length;
+  body+=H('Calidad percibida (escala 1–3)');
+  body+='<table style="border-collapse:collapse;width:100%;font-size:9.5pt">';
+  body+=tr(['Dimensión','Media','Mala (1)','Regular (2)','Buena (3)'],{head:true});
+  const qRow=(lab,key)=>{const n=qTot(key);const pc=v=>n?Math.round(qCount(key,v)/n*100):0;
+    return tr([lab, qAvgW(key)==null?'—':R2(qAvgW(key)), qCount(key,1)+' ('+pc(1)+'%)', qCount(key,2)+' ('+pc(2)+'%)', qCount(key,3)+' ('+pc(3)+'%)']);};
+  body+=qRow('Calidad del sueño','qs');
+  body+=qRow('Calidad del despertar','qd');
+  body+=qRow('Estado durante el día','qe');
+  body+='</table>';
+  body+='<p style="font-size:9pt;color:#555;margin:6px 0 0">Acontecimientos reportados (total): <b>'+(T.evSum||0)+'</b>'+(T.evMean==null?'':' · '+R2(T.evMean)+' por noche')+'</p>';
+
   // cronotipo
   body+=H('Cronotipo y estimación de DLMO');
   body+='<table style="border-collapse:collapse;width:100%;font-size:9.5pt">';
@@ -3758,6 +3817,25 @@ async function exportAnalysisWord(){
   body+=tr(['Cronotipo estimado',esc(A.chrono)]);
   body+=tr(['DLMO estimado (aprox.)',C(A.DLMO)+' — estimación indirecta']);
   body+='</table>';
+
+  // acontecimientos reportados
+  const evList=[];
+  for(let d=0;d<DAYS;d++){
+    const evs=(state[d].events||[]).slice().sort((a,b)=>a-b);
+    if(!evs.length)continue;
+    const lbl=(typeof label==='function')?label(d):{dn:'Día '+(d+1)};
+    evs.forEach(pos=>evList.push({dia:d+1, fecha:lbl.dn, hora:C(slotClock(pos)), desc:(state[d].cmt||'').trim()}));
+  }
+  body+=H('Acontecimientos reportados');
+  if(evList.length){
+    body+='<p style="font-size:9pt;color:#555;margin:0 0 6px">Sucesos puntuales marcados durante la noche ('+evList.length+' en total). La descripción procede del campo «Tratamiento · Observaciones» de cada día.</p>';
+    body+='<table style="border-collapse:collapse;width:100%;font-size:9pt">';
+    body+=tr(['Día','Hora','Descripción'],{head:true});
+    evList.forEach(e=>body+=tr(['Día '+e.dia+' · '+esc(e.fecha), e.hora, e.desc?esc(e.desc):'(sin descripción)']));
+    body+='</table>';
+  }else{
+    body+='<p style="font-size:9.5pt;color:#555">No se han registrado acontecimientos en este periodo.</p>';
+  }
 
   // informe clínico provisional
   const repData=Object.assign({},A,{
@@ -3786,11 +3864,115 @@ async function exportAnalysisWord(){
       const PP=(t,o={})=>new Paragraph({spacing:{after:o.after==null?60:o.after},children:[new TextRun({text:t,size:o.size||20,italics:!!o.italics,color:o.color||"222222"})]});
       const plainDatos=datos.map(d=>d.replace(/<[^>]+>/g,''));
       const ch=[];
-      ch.push(new Paragraph({spacing:{after:20},children:[new TextRun({text:"Agenda de Sueño — Informe clínico",bold:true,color:DEEP,size:32})]}));
+      ch.push(new Paragraph({spacing:{after:20},children:[new TextRun({text:"Agenda de Sueño — Análisis completo",bold:true,color:DEEP,size:32})]}));
       ch.push(new Paragraph({spacing:{after:40},children:[new TextRun({text:"AdSalutem · Instituto del Sueño",color:MIST,size:18})]}));
       ch.push(new Paragraph({spacing:{after:160},border:{bottom:{style:BorderStyle.SINGLE,size:8,color:DEEP,space:4}},children:[new TextRun({text:plainDatos.join('  ·  '),size:19,color:"42546A"})]}));
-      // ── Word EDITABLE: solo el informe clínico y la calidad percibida ──
-      // (todas las métricas y tablas se recogen en el PDF del análisis completo)
+      // ── Word con TODAS las métricas del análisis (equivalente al PDF) ──
+      const R2n=x=>x==null?'—':Math.round(x*100)/100;
+      const Cn=min=>min==null?'—':fmtClock(min);
+      const HMn=min=>min==null?'—':fmtHM(min);
+      const ev=e=>e?e.txt:'';
+
+      // 1) Métricas globales
+      ch.push(H2("Métricas globales (media de 3 semanas) y puntos de corte"));
+      ch.push(PP(AG==null?'No consta la fecha de nacimiento: se aplican umbrales de adulto (18-64).':'Paciente de '+AG+' años; puntos de corte ajustados por edad (NSF 2015; Ohayon 2004).',{size:17,color:MIST}));
+      const mg=[trow([tc('Métrica',{head:true}),tc('Valor',{head:true}),tc('Valoración',{head:true})])];
+      const mgRow=(a,b,c)=>mg.push(trow([tc(a,{lab:true}),tc(b),tc(c||'')]));
+      mgRow('Tiempo total de sueño (TST)',HMn(T.tst),ev(cutTST(T.tst,AG)));
+      mgRow('Tiempo en cama (TIB)',HMn(T.tib),'');
+      mgRow('Eficiencia del sueño (SE)',R2n(T.se)+'%',ev(cutSE(T.se,AG)));
+      mgRow('Latencia de sueño (SOL)',R2n(T.sol)+' min',ev(cutSOL(T.sol,AG)));
+      mgRow('Despertar terminal',R2n(T.wakeLat)+' min',ev(cutWakeLat(T.wakeLat,AG)));
+      mgRow('Despierto tras inicio (WASO)',R2n(T.waso)+' min',ev(cutWASO(T.waso,AG)));
+      mgRow('Nº despertares (NWAK)',R2n(T.nWake),ev(cutNWAK(T.nWake)));
+      mgRow('Tiempo total despierto (TWT)',R2n(T.twt)+' min','');
+      mgRow('Variabilidad del TST (DE)',R2n(T.tstSd)+' min',ev(cutVar(T.tstSd)));
+      mgRow('Variabilidad horaria (DE)',R2n(A.maxTimingSd)+' min',ev(cutVar(A.maxTimingSd)));
+      mgRow('Índice de regularidad (SRI)',R2n(A.SRI),ev(cutSRI(A.SRI)));
+      mgRow('Estabilidad interdiaria (IS)',R2n(A.IS),'');
+      mgRow('Jet-lag social (|MSF−MSW|)',A.jetSocial==null?'—':HMn(Math.abs(A.jetSocial)),ev(cutSJL(A.jetSocial)));
+      mgRow('Cronotipo (MSFsc)',A.chrono,Cn(A.MSFsc));
+      ch.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[4200,2400,2760],rows:mg}));
+
+      // 2) Indicadores de regularidad
+      ch.push(H2("Indicadores de regularidad"));
+      const reg=[trow([tc('Indicador',{head:true}),tc('Valor',{head:true}),tc('Valoración',{head:true})])];
+      const regRowN=(a,b,c)=>reg.push(trow([tc(a,{lab:true}),tc(b),tc(c||'')]));
+      regRowN('Desviación de la duración del sueño (TST)',T.tstSd==null?'—':'±'+R2n(T.tstSd)+' min',ev(cutVar(T.tstSd)));
+      regRowN('Desviación de la hora de acostarse','±'+R2n(T.bedSd||0)+' min',ev(cutVar(T.bedSd)));
+      regRowN('Desviación de la hora de levantarse','±'+R2n(T.riseSd||0)+' min',ev(cutVar(T.riseSd)));
+      regRowN('Variabilidad horaria global (DE)','±'+R2n(A.maxTimingSd)+' min',ev(cutVar(A.maxTimingSd)));
+      regRowN('Índice de regularidad del sueño (SRI)',A.SRI==null?'—':R2n(A.SRI),ev(cutSRI(A.SRI)));
+      regRowN('Estabilidad interdiaria (IS)',A.IS==null?'—':R2n(A.IS),'');
+      regRowN('Jet-lag social (|MSF−MSW|)',A.jetSocial==null?'—':HMn(Math.abs(A.jetSocial)),ev(cutSJL(A.jetSocial)));
+      regRowN('Jet-lag social corregido (SJLsc)',A.jetSocialSc==null?'—':HMn(Math.abs(A.jetSocialSc)),ev(cutSJL(A.jetSocialSc)));
+      ch.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[4200,2400,2760],rows:reg}));
+
+      // 3) Comparativa laborables vs. festivos
+      ch.push(H2("Comparativa laborables vs. festivos"));
+      const cmp=[trow([tc('Parámetro',{head:true}),tc('Laborables',{head:true}),tc('Festivos',{head:true})])];
+      const cmpRow=(a,b,c)=>cmp.push(trow([tc(a,{lab:true}),tc(b),tc(c)]));
+      cmpRow('Tiempo total de sueño',HMn(L.tst),HMn(F.tst));
+      cmpRow('Eficiencia',R2n(L.se)+'%',R2n(F.se)+'%');
+      cmpRow('Punto medio del sueño',Cn(L.mid),Cn(F.mid));
+      cmpRow('Hora de acostarse',Cn(L.bed),Cn(F.bed));
+      cmpRow('Hora de levantarse',Cn(L.rise),Cn(F.rise));
+      cmpRow('Jet-lag social (|MSF−MSW|)','',A.jetSocial==null?'—':HMn(Math.abs(A.jetSocial)));
+      ch.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[3760,2800,2800],rows:cmp}));
+
+      // 4) Cronotipo y DLMO
+      ch.push(H2("Cronotipo y estimación de DLMO"));
+      const cro=[trow([tc('Parámetro',{head:true}),tc('Valor',{head:true})])];
+      const croRow=(a,b)=>cro.push(trow([tc(a,{lab:true}),tc(b)]));
+      croRow('MSF (punto medio en días libres)',Cn(A.MSF));
+      croRow('MSFsc (corregido por déficit)',Cn(A.MSFsc));
+      croRow('Cronotipo estimado',A.chrono);
+      croRow('DLMO estimado (aprox.)',Cn(A.DLMO)+' — estimación indirecta');
+      ch.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[5600,3760],rows:cro}));
+
+      // 5) Resumen por día, semana y total
+      ch.push(H2("Resumen por día, semana y total"));
+      const QWn=v=>({0:'—',1:'Mala',2:'Reg.',3:'Buena'}[v]||'—');
+      const allD=A.all||[];
+      const hcol=['Día','Acost.','Lev.','P.med','Lat.','D.term','TST','TIB','WASO','Nºd','Efic','Sie.','Ac.','Cs','Cd','Ed'];
+      const dayR=[trow(hcol.map(x=>tc(x,{head:true})))];
+      for(let wk=0;wk<3;wk++){
+        for(let k=0;k<7;k++){
+          const d=wk*7+k,m=allD[d];
+          const lbl=(typeof label==='function')?label(d):{dn:'D'+(d+1)};
+          const fest=state[d].lf==='F';
+          const at=(typeof diaAtipico==='function')?diaAtipico(m):null;
+          const nom=lbl.dn+(fest?' ✦':'')+(at?' ⚠':'');
+          const cells=[nom,m.hasData?Cn(m.bedDisp):'—',m.hasData?Cn(m.riseDisp):'—',m.midSleep==null?'—':Cn(m.midSleep),
+            m.sol==null?'—':R2n(m.sol),m.wakeLat==null?'—':R2n(m.wakeLat),m.hasData?HMn(m.tst):'—',m.tib?HMn(m.tib):'—',
+            m.hasData?R2n(m.waso):'—',m.nWake==null?'—':m.nWake,m.se==null?'—':R2n(m.se)+'%',m.napMin?m.napMin:'—',
+            m.nEvents?m.nEvents:'—',QWn(state[d].qs),QWn(state[d].qd),QWn(state[d].qe)];
+          const shade=at?'FFF6E6':(fest?'F4F0E6':undefined);
+          dayR.push(new TableRow({children:cells.map(c=>new TableCell({borders:cb,shading:shade?{type:"clear",fill:shade}:undefined,children:[new Paragraph({children:[new TextRun({text:String(c==null?'':c),size:14})]})]}))}));
+        }
+        const w=A.weeks[wk];
+        dayR.push(trow([tc('Sem. '+(wk+1),{lab:true}),tc(Cn(w.bed),{lab:true}),tc(Cn(w.rise),{lab:true}),tc(Cn(w.mid),{lab:true}),tc(w.sol==null?'—':R2n(w.sol),{lab:true}),tc(w.wakeLat==null?'—':R2n(w.wakeLat),{lab:true}),tc(HMn(w.tst),{lab:true}),tc(HMn(w.tib),{lab:true}),tc(w.waso==null?'—':R2n(w.waso),{lab:true}),tc(w.nWake==null?'—':R2n(w.nWake),{lab:true}),tc(w.se==null?'—':R2n(w.se)+'%',{lab:true}),tc(w.nap==null?'—':R2n(w.nap),{lab:true}),tc(w.evSum||'—',{lab:true}),tc(R2n(w.qs),{lab:true}),tc(R2n(w.qd),{lab:true}),tc(R2n(w.qe),{lab:true})]));
+      }
+      dayR.push(trow([tc('TOTAL',{lab:true}),tc(Cn(T.bed),{lab:true}),tc(Cn(T.rise),{lab:true}),tc(Cn(T.mid),{lab:true}),tc(T.sol==null?'—':R2n(T.sol),{lab:true}),tc(T.wakeLat==null?'—':R2n(T.wakeLat),{lab:true}),tc(HMn(T.tst),{lab:true}),tc(HMn(T.tib),{lab:true}),tc(R2n(T.waso),{lab:true}),tc(T.nWake==null?'—':R2n(T.nWake),{lab:true}),tc(R2n(T.se)+'%',{lab:true}),tc(R2n(T.nap),{lab:true}),tc(T.evSum||'—',{lab:true}),tc(R2n(T.qs),{lab:true}),tc(R2n(T.qd),{lab:true}),tc(R2n(T.qe),{lab:true})]));
+      ch.push(new Table({width:{size:9360,type:WidthType.DXA},rows:dayR}));
+      // aviso días atípicos
+      const marc=[];
+      for(let d=0;d<allD.length;d++){const a2=(typeof diaAtipico==='function')?diaAtipico(allD[d]):null;if(a2)marc.push('Día '+(d+1)+' ('+a2.motivos.join('; ')+')');}
+      if(marc.length)ch.push(PP('⚠ Días atípicos para revisar ('+marc.length+'): '+marc.join('; ')+'. Métricas fisiológicamente extremas; no se ha modificado ningún cálculo, solo se señalan.',{size:16,color:"8A5A12"}));
+
+      // 6) Acontecimientos
+      const evL=[];
+      for(let d=0;d<DAYS;d++){const evs=(state[d].events||[]).slice().sort((a,b)=>a-b);if(!evs.length)continue;const lbl=(typeof label==='function')?label(d):{dn:'D'+(d+1)};evs.forEach(pos=>evL.push({dia:d+1,fecha:lbl.dn,hora:Cn(slotClock(pos)),desc:(state[d].cmt||'').trim()}));}
+      ch.push(H2("Acontecimientos reportados"));
+      if(evL.length){
+        const evR=[trow([tc('Día',{head:true}),tc('Hora',{head:true}),tc('Descripción',{head:true})])];
+        evL.forEach(e=>evR.push(trow([tc('Día '+e.dia,{lab:true}),tc(e.hora),tc(e.desc||'(sin descripción)')])));
+        ch.push(new Table({width:{size:9360,type:WidthType.DXA},columnWidths:[1800,1200,6360],rows:evR}));
+      }else{
+        ch.push(PP("No se han registrado acontecimientos en este periodo.",{italics:true,size:18,color:MIST}));
+      }
+
+      // ── Calidad percibida y informe clínico ──
       ch.push(H2("Calidad de sueño percibida"));
       ch.push(PP("Valoración diaria del paciente (escala 1-3: mala, regular, buena) a lo largo de las tres semanas.",{size:18,color:MIST}));
       const qLbl={qs:'Calidad del sueño',qd:'Calidad del despertar',qe:'Estado durante el día'};
@@ -3824,10 +4006,10 @@ async function exportAnalysisWord(){
       const doc=new Document({sections});
       Packer.toBlob(doc).then(blob=>{
         const url=URL.createObjectURL(blob);
-        const a=document.createElement('a'); a.href=url; a.download='agenda_sueno_'+patient+'_informe_clinico_v'+APP_VER_FILE+'.docx';
+        const a=document.createElement('a'); a.href=url; a.download='agenda_sueno_'+patient+'_analisis_completo_v'+APP_VER_FILE+'.docx';
         document.body.appendChild(a); a.click();
         setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},100);
-        toast('Word del informe clínico generado');
+        toast('Word del análisis completo generado');
       }).catch(()=>{toast('No se pudo generar el Word',false);});
       return;
     }catch(e){ /* si falla, se usa el fallback HTML-Word de abajo */ }
